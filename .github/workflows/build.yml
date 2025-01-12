@@ -27,7 +27,8 @@ jobs:
         pip install pyinstaller
 
     - name: Build executable with PyInstaller
-      run: python -m PyInstaller --onefile --windowed scrapper.py
+      run: python -m PyInstaller --onefile --windowed --hidden-import=selenium --hidden-import=webdriver_manager --hidden-import=bs4 --hidden-import=pandas scrapper.py
+
 
     - name: Upload artifact
       uses: actions/upload-artifact@v3
