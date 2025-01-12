@@ -39,15 +39,27 @@ def sort_column(tv, col, reverse):
 
 
 def check_single_instance():
-    """Проверяет, запущен ли уже экземпляр приложения, используя локальный сокет."""
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        # Пытаемся привязаться к локальному порту 65432; если не получится - приложение уже запущено
-        s.bind(("127.0.0.1", 65432))
-    except socket.error:
-        messagebox.showwarning("Warning", "Program is already running.")
-        sys.exit(0)
-    return s
+    """Проверяет единственный экземпляр приложения с помощью блокировки файла на Windows, иначе с помощью сокета."""
+    if os.name == 'nt':  # Если ОС Windows
+        import msvcrt
+        try:
+            # Открываем (или создаём) файл блокировки
+            lockfile = open("app.lock", "w")
+            # Пытаемся установить неблокирующую блокировку на 1 байт
+            msvcrt.locking(lockfile.fileno(), msvcrt.LK_NBLCK, 1)
+        except IOError:
+            messagebox.showwarning("Warning", "Program is already running.")
+            sys.exit(0)
+    else:
+        # Для остальных ОС используем проверку через сокет
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s.bind(("127.0.0.1", 65432))
+        except socket.error:
+            messagebox.showwarning("Warning", "Program is already running.")
+            sys.exit(0)
+        return s
+
 
 
 # -------------------------------
@@ -1108,5 +1120,6 @@ if __name__ == "__main__":
     root.deiconify()  # Показываем главное окно после информационного окна
     gui = ScraperGUI(root)
     root.mainloop()
+
 
 
