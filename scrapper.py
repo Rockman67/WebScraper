@@ -40,10 +40,11 @@ def sort_column(tv, col, reverse):
 
 def check_single_instance():
     """Проверяет единственный экземпляр приложения с помощью блокировки файла на Windows, иначе с помощью сокета."""
+    global lockfile
     if os.name == 'nt':  # Если ОС Windows
         import msvcrt
         try:
-            # Открываем (или создаём) файл блокировки
+            # Открываем (или создаём) файл блокировки и сохраняем в глобальную переменную
             lockfile = open("app.lock", "w")
             # Пытаемся установить неблокирующую блокировку на 1 байт
             msvcrt.locking(lockfile.fileno(), msvcrt.LK_NBLCK, 1)
@@ -59,6 +60,7 @@ def check_single_instance():
             messagebox.showwarning("Warning", "Program is already running.")
             sys.exit(0)
         return s
+
 
 
 
@@ -1112,9 +1114,9 @@ def main():
 
 
 if __name__ == "__main__":
+    check_single_instance()  # Проверка на уже запущенный экземпляр
     root = tk.Tk()
     root.withdraw()  # Скрываем главное окно для показа первого сообщения
-    check_single_instance()  # Проверка на уже запущенный экземпляр
     messagebox.showinfo("Launching", "Program is starting...")  # Всплывающее информационное окно
     logging.info("Program has been launched.")
     root.deiconify()  # Показываем главное окно после информационного окна
