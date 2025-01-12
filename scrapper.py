@@ -25,6 +25,7 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 import pandas as pd
+import socket
 
 def sort_column(tv, col, reverse):
     l = [(tv.set(k, col), k) for k in tv.get_children('')]
@@ -35,6 +36,18 @@ def sort_column(tv, col, reverse):
     for index, (val, k) in enumerate(l):
         tv.move(k, '', index)
     tv.heading(col, command=lambda: sort_column(tv, col, not reverse))
+
+
+def check_single_instance():
+    """Проверяет, запущен ли уже экземпляр приложения, используя локальный сокет."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        # Пытаемся привязаться к локальному порту 65432; если не получится - приложение уже запущено
+        s.bind(("127.0.0.1", 65432))
+    except socket.error:
+        messagebox.showwarning("Warning", "Program is already running.")
+        sys.exit(0)
+    return s
 
 
 # -------------------------------
@@ -1088,6 +1101,11 @@ def main():
 
 if __name__ == "__main__":
     root = tk.Tk()
+    root.withdraw()  # Скрываем главное окно для показа первого сообщения
+    check_single_instance()  # Проверка на уже запущенный экземпляр
+    messagebox.showinfo("Launching", "Program is starting...")  # Всплывающее информационное окно
+    root.deiconify()  # Показываем главное окно после информационного окна
     gui = ScraperGUI(root)
     root.mainloop()
+
 
