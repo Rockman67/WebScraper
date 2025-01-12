@@ -1104,6 +1104,7 @@ if __name__ == "__main__":
     root.withdraw()  # Скрываем главное окно для показа первого сообщения
     check_single_instance()  # Проверка на уже запущенный экземпляр
     messagebox.showinfo("Launching", "Program is starting...")  # Всплывающее информационное окно
+    logging.info("Program has been launched.")
     root.deiconify()  # Показываем главное окно после информационного окна
     gui = ScraperGUI(root)
     root.mainloop()
