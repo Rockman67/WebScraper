@@ -2,10 +2,10 @@ name: Build Executable
 
 on:
   push:
-    branches: [ main ]      # Или master, если у вас основная ветка называется master
+    branches: [ main ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch:         # Позволяет запускать workflow вручную
+  workflow_dispatch:
 
 jobs:
   build:
@@ -18,7 +18,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.8'  # Или другая версия Python, нужная вам
+        python-version: '3.8'  # Или другую версию Python, если необходимо
 
     - name: Install dependencies
       run: |
@@ -27,14 +27,8 @@ jobs:
         pip install pyinstaller
 
     - name: Build executable with PyInstaller
-      # Собираем ваш scrapper.py в один exe
       run: |
-        python -m PyInstaller --onefile --windowed ^
-          --hidden-import=selenium ^
-          --hidden-import=webdriver_manager ^
-          --hidden-import=bs4 ^
-          --hidden-import=pandas ^
-          scrapper.py
+        python -m PyInstaller --onefile --windowed --hidden-import=selenium --hidden-import=webdriver_manager --hidden-import=bs4 --hidden-import=pandas scrapper.py
 
     - name: Upload artifact
       uses: actions/upload-artifact@v3
