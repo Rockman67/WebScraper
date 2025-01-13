@@ -221,9 +221,6 @@ for handler in logging.root.handlers[:]:
 # Общая настройка Selenium (драйвера)
 # =====================================================================
 def setup_driver(screenshot_folder):
-    """
-    Создаёт и настраивает Chrome WebDriver, включая headless-режим и отключение изображений.
-    """
     chrome_options = Options()
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--disable-gpu")
@@ -233,14 +230,21 @@ def setup_driver(screenshot_folder):
     chrome_options.add_experimental_option("prefs", chrome_prefs)
     chrome_options.add_argument("--disable-extensions")
     chrome_options.add_argument("--disable-dev-shm-usage")
+
     try:
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
+
+        # Добавляем таймауты
+        driver.set_page_load_timeout(180)    # Можно увеличить, если нужно
+        driver.set_script_timeout(180)       # Аналогично, время на выполнение JS
+
         logging.info("Chrome WebDriver initialized successfully.")
         return driver
     except Exception as e:
         logging.error(f"Failed to initialize Chrome WebDriver: {e}")
         raise
+
 
 # =====================================================================
 # Вспомогательные функции для скриншотов, каталогов и т.д.
@@ -274,29 +278,36 @@ def save_screenshot(driver, screenshot_folder, filename):
 # ------------------------------- OSH Cut Parsing -----------------------
 # =====================================================================
 def navigate_to_sheet_page(driver, screenshot_folder):
-    """
-    Переход на страницу OSH Cut /catalog/sheet
-    """
-    try:
-        SHEET_URL = "https://app.oshcut.com/catalog/sheet"
-        driver.get(SHEET_URL)
-        logging.info(f"Loaded page: {SHEET_URL}")
-        wait = WebDriverWait(driver, 60)
-        wait.until(EC.presence_of_element_located(
-            (By.XPATH, "//div[contains(@class, 'filterBoxHeader') and contains(text(), 'Material')]"))
-        )
-        logging.info("Categories loaded.")
-        time.sleep(2)
-    except TimeoutException:
-        logging.exception("Timeout while loading the 'Sheet' page.")
-        if driver:
-            save_screenshot(driver, screenshot_folder, 'navigate_to_sheet_timeout.png')
-        raise
-    except Exception as e:
-        logging.exception(f"Error loading 'Sheet' page: {e}")
-        if driver:
-            save_screenshot(driver, screenshot_folder, 'navigate_to_sheet_error.png')
-        raise
+    SHEET_URL = "https://app.oshcut.com/catalog/sheet"
+    MAX_RETRIES = 2  # Можно 3, если хотите больше попыток
+
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            logging.info(f"Loading OSH Cut page (attempt {attempt}/{MAX_RETRIES}): {SHEET_URL}")
+            driver.get(SHEET_URL)
+
+            wait = WebDriverWait(driver, 60)
+            wait.until(EC.presence_of_element_located(
+                (By.XPATH, "//div[contains(@class, 'filterBoxHeader') and contains(text(), 'Material')]"))
+            )
+            logging.info("Categories loaded. Page is ready.")
+            time.sleep(2)
+            return  # Если здесь успешно - выходим из функции
+        except TimeoutException:
+            logging.exception("Timeout while waiting for 'Material' filter to appear.")
+            save_screenshot(driver, screenshot_folder, f"navigate_to_sheet_timeout_attempt{attempt}.png")
+            if attempt == MAX_RETRIES:
+                raise
+            else:
+                logging.info(f"Retrying page load (attempt {attempt+1}/{MAX_RETRIES})...")
+        except Exception as e:
+            logging.exception(f"Error loading '{SHEET_URL}' (attempt {attempt}/{MAX_RETRIES}): {e}")
+            save_screenshot(driver, screenshot_folder, f"navigate_to_sheet_error_attempt{attempt}.png")
+            if attempt == MAX_RETRIES:
+                raise
+            else:
+                logging.info(f"Retrying page load (attempt {attempt+1}/{MAX_RETRIES})...")
+
 
 def extract_categories(driver):
     """
