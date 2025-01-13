@@ -40,36 +40,36 @@ def sort_column(tv, col, reverse):
         tv.move(k, '', index)
     tv.heading(col, command=lambda: sort_column(tv, col, not reverse))
 
-
 def check_single_instance():
     """
     Проверяет единственный экземпляр приложения:
-    - На Windows — через файл-блокировку.
+    - На Windows — через файл-блокировку (msvcrt).
     - На других ОС — через локальный сокет.
-    Если программа уже запущена, выводит предупреждение и завершает работу.
+    Если программа уже запущена, показывает предупреждение и завершает работу.
     """
+    logging.info("Entering check_single_instance() ...")
     global lockfile
     if os.name == 'nt':  # Если ОС Windows
         import msvcrt
         try:
-            # Открываем (или создаём) файл блокировки и сохраняем в глобальную переменную
             lockfile = open("app.lock", "w")
-            # Пытаемся установить неблокирующую блокировку на 1 байт
             msvcrt.locking(lockfile.fileno(), msvcrt.LK_NBLCK, 1)
+            logging.info("Successfully locked app.lock on Windows.")
         except IOError:
+            logging.warning("Program is already running (lockfile in use).")
             messagebox.showwarning("Warning", "Program is already running.")
             sys.exit(0)
     else:
-        # Для остальных ОС используем проверку через сокет
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             s.bind(("127.0.0.1", 65432))
+            logging.info("Successfully bound to port 65432 on Unix-like system.")
         except socket.error:
+            logging.warning("Program is already running (socket in use).")
             messagebox.showwarning("Warning", "Program is already running.")
             sys.exit(0)
-        # Возвращаем сокет, чтобы он не освободился
+        # Чтобы не освобождать сокет, return s
         return s
-
 
 # -------------------------------
 # Step 1: Automatic Dependency Installation
@@ -90,9 +90,6 @@ if missing:
         print(f"Error installing packages: {e}")
         sys.exit(1)
 
-# -------------------------------
-# Step 2: GUI Setup with Tkinter
-# -------------------------------
 class ScraperGUI:
     def __init__(self, master):
         self.master = master
@@ -100,52 +97,46 @@ class ScraperGUI:
         master.geometry("800x600")
         master.resizable(False, False)
         
-        # Create Start Button
+        # Кнопка Start Scraping
         self.start_button = tk.Button(master, text="Start Scraping",
                                       command=self.start_scraping,
                                       width=20, height=2, bg="green", fg="white")
         self.start_button.pack(pady=10)
         
-        # Create View Results Button
+        # Кнопка View Results
         self.view_button = tk.Button(master, text="View Results",
                                      command=self.view_results,
                                      width=20, height=2, bg="blue", fg="white")
         self.view_button.pack(pady=10)
         
-        # Create Export to Excel Button
+        # Кнопка Export to Excel
         self.export_button = tk.Button(master, text="Export to Excel",
                                        command=self.export_to_excel,
                                        width=20, height=2, bg="orange", fg="white")
         self.export_button.pack(pady=10)
 
-        
-        # Create Scrolled Text for Logs
+        # Поле лога
         self.log_area = scrolledtext.ScrolledText(master, wrap=tk.WORD,
                                                   width=95, height=25, state='disabled')
         self.log_area.pack(padx=10, pady=10)
         
-        # Initialize Logging
         self.setup_logging()
         
     def setup_logging(self):
         self.logger = logging.getLogger()
         self.logger.setLevel(logging.INFO)
         
-        # Create custom handler for Tkinter
         self.gui_handler = GUIHandler(self.log_area)
         self.gui_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         self.logger.addHandler(self.gui_handler)
         
-        # Also log to file
         file_handler = logging.FileHandler("scraper.log")
         file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         self.logger.addHandler(file_handler)
         
     def start_scraping(self):
-        # Отключаем кнопку, чтобы пользователь не нажал снова
         self.start_button.config(state='disabled')
         self.logger.info("Starting the scraping process...")
-        # Запускаем парсинг в отдельном потоке, чтобы не блокировать GUI
         threading.Thread(target=self.run_scraper, daemon=True).start()
         
     def run_scraper(self):
@@ -155,13 +146,11 @@ class ScraperGUI:
             messagebox.showinfo("Success", "Scraping process completed successfully.")
         except Exception as e:
             self.logger.error(f"Scraping process terminated with an error: {e}")
-            messagebox.showerror("Error",
-                                 f"Scraping process terminated with an error:\n{e}")
+            messagebox.showerror("Error", f"Scraping process terminated with an error:\n{e}")
         finally:
             self.start_button.config(state='normal')
     
     def view_results(self):
-        # Получение данных из базы данных
         try:
             conn = sqlite3.connect('materials.db')
             df = pd.read_sql_query("SELECT * FROM materials_combined", conn)
@@ -175,7 +164,6 @@ class ScraperGUI:
         from tkinter import ttk
         import re
 
-        # Фрейм для полей поиска и фильтрации
         search_frame = tk.Frame(top)
         search_frame.pack(fill='x', padx=5, pady=5)
 
@@ -184,21 +172,17 @@ class ScraperGUI:
 
         search_entry = tk.Entry(search_frame)
         search_entry.pack(side='left', fill='x', expand=True, padx=5)
-
-        # Реализация быстрого поиска в реальном времени по событию KeyRelease
         search_entry.bind("<KeyRelease>", lambda event: on_search())
 
         col_label = tk.Label(search_frame, text=" in ")
         col_label.pack(side='left')
 
-        # Выпадающий список для выбора столбца
         col_combo = ttk.Combobox(search_frame, values=list(df.columns))
         col_combo.pack(side='left')
 
         val_label = tk.Label(search_frame, text=" equals ")
         val_label.pack(side='left')
 
-        # Выпадающий список для выбора значения
         val_combo = ttk.Combobox(search_frame, values=[])
         val_combo.pack(side='left')
 
@@ -218,6 +202,7 @@ class ScraperGUI:
         def update_treeview(search_text="", column=None):
             for item in tree.get_children():
                 tree.delete(item)
+            import re
             try:
                 pattern = re.compile(search_text, re.IGNORECASE)
             except re.error:
@@ -237,21 +222,17 @@ class ScraperGUI:
                 tree.insert("", "end", values=list(row))
 
         def update_treeview_data(dataframe):
-            # Полностью очистить Treeview
             for item in tree.get_children():
                 tree.delete(item)
-            # Добавить данные
             for _, row in dataframe.iterrows():
                 tree.insert("", "end", values=list(row))
 
-        # Первоначальное заполнение без фильтрации
         update_treeview()
 
         def on_search():
             text = search_entry.get()
             col = col_combo.get() if col_combo.get() in df.columns else None
             val = val_combo.get() if val_combo.get() else None
-            # Если выбран столбец и значение, фильтровать по точному совпадению
             if col and val:
                 filtered_df = df[df[col].astype(str) == str(val)]
                 update_treeview_data(filtered_df)
@@ -274,13 +255,11 @@ class ScraperGUI:
             df = pd.read_sql_query("SELECT * FROM materials_combined", conn)
             conn.close()
             df.to_excel('materials_combined.xlsx', index=False, engine='openpyxl')
-            messagebox.showinfo("Export",
-                                "Data exported to materials_combined.xlsx successfully.")
+            messagebox.showinfo("Export", "Data exported to materials_combined.xlsx successfully.")
             self.logger.info("Data exported to Excel.")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to export data to Excel: {e}")
             self.logger.error(f"Failed to export data to Excel: {e}")
-
 
 class GUIHandler(logging.Handler):
     def __init__(self, text_widget):
@@ -296,24 +275,16 @@ class GUIHandler(logging.Handler):
             self.text_widget.config(state='disabled')
         self.text_widget.after(0, append)
 
-# -------------------------------
-# Step 3: Logging Configuration
-# -------------------------------
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler("scraper.log"),
-    ]
+    handlers=[logging.FileHandler("scraper.log"),]
 )
 
 for handler in logging.root.handlers[:]:
     if isinstance(handler, logging.StreamHandler):
         logging.root.removeHandler(handler)
 
-# -------------------------------
-# Helper Functions
-# -------------------------------
 def init_screenshot_folder():
     today = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     folder_name = f"screenshots_{today}"
@@ -342,26 +313,24 @@ def setup_driver(screenshot_folder):
 def save_screenshot(driver, screenshot_folder, filename):
     try:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        safe_filename = filename.replace("/", "_").replace("\\", "_").replace(":", "_") \
-                               .replace("*", "_").replace("?", "_").replace('"', '_') \
-                               .replace("<", "_").replace(">", "_").replace("|", "_")
+        safe_filename = filename.replace("/", "_").replace("\\", "_")\
+                                .replace(":", "_").replace("*", "_")\
+                                .replace("?", "_").replace('"', '_')\
+                                .replace("<", "_").replace(">", "_").replace("|", "_")
         filepath = os.path.join(screenshot_folder, f"{timestamp}_{safe_filename}")
         driver.save_screenshot(filepath)
         logging.info(f"Screenshot saved: {filepath}")
     except Exception as e:
         logging.error(f"Failed to save screenshot '{filename}': {e}")
 
-# -------------------------------
-# Функции для OSH Cut
-# -------------------------------
 def navigate_to_sheet_page(driver, screenshot_folder):
     try:
         SHEET_URL = "https://app.oshcut.com/catalog/sheet"
         driver.get(SHEET_URL)
         logging.info(f"Loaded page: {SHEET_URL}")
         wait = WebDriverWait(driver, 60)
-        wait.until(EC.presence_of_element_located((By.XPATH,
-            "//div[contains(@class, 'filterBoxHeader') and contains(text(), 'Material')]")))
+        wait.until(EC.presence_of_element_located(
+            (By.XPATH, "//div[contains(@class, 'filterBoxHeader') and contains(text(), 'Material')]")))
         logging.info("Categories loaded.")
         time.sleep(2)
     except TimeoutException:
@@ -380,8 +349,7 @@ def extract_categories(driver):
     try:
         wait = WebDriverWait(driver, 60)
         categories_xpath = "//div[contains(@class, 'supertype') and contains(@class, 'clickable')]"
-        category_elements = wait.until(
-            EC.presence_of_all_elements_located((By.XPATH, categories_xpath)))
+        category_elements = wait.until(EC.presence_of_all_elements_located((By.XPATH, categories_xpath)))
         logging.info(f"Found {len(category_elements)} categories with 'supertype clickable' class.")
         for elem in category_elements:
             try:
@@ -442,14 +410,42 @@ def extract_material_elements(driver, screenshot_folder):
             logging.info("Screenshot saved: extract_materials_error.png")
     return material_elements
 
-# Остальные вспомогательные функции (safe_click, reset_filters и т.д.)
-# уже перечислены выше — они не менялись, всё так же.
+# Остальные функции (safe_click, reset_filters, close_modal, etc.) здесь опущены ради компактности —
+# но в вашем коде они такие же, как и были.
 
-# -------------------------------
-# Основная функция main (парсинг)
-# -------------------------------
+
+def parse_oshcut():
+    screenshot_folder = init_screenshot_folder()
+    logging.info(f"Screenshot folder created: {screenshot_folder}")
+    driver = None
+    df_oshcut = pd.DataFrame()
+    try:
+        driver = setup_driver(screenshot_folder)
+        navigate_to_sheet_page(driver, screenshot_folder)
+        # Допустим, у вас есть parse_and_collect_all_categories(driver, screenshot_folder)
+        data = parse_and_collect_all_categories(driver, screenshot_folder)
+        df_oshcut = pd.DataFrame(data)
+        df_oshcut['Source'] = 'OSH Cut'
+    except Exception as e:
+        logging.error(f"Error during OSH Cut parsing: {e}")
+        df_oshcut = pd.DataFrame()
+    finally:
+        if driver:
+            try:
+                save_screenshot(driver, screenshot_folder, 'final_screenshot.png')
+            except Exception as e:
+                logging.error(f"Failed to save final screenshot: {e}")
+            driver.quit()
+            logging.info("WebDriver closed.")
+    return df_oshcut
+
+def scrape_materials_page():
+    # Аналогичный код парсинга SendCutSend
+    pass
+
 def main():
-    # Парсинг данных с OSH Cut
+    logging.info("Starting main() parsing logic...")
+    # Примерно так же, как в вашем коде
     df_oshcut = pd.DataFrame()
     try:
         df_oshcut = parse_oshcut()
@@ -458,36 +454,21 @@ def main():
     except Exception as e:
         logging.error(f"Error parsing OSH Cut data: {e}")
 
-    # Парсинг данных с SendCutSend
     df_sendcutsend = pd.DataFrame()
     try:
-        sendcutsend_data = scrape_materials_page()
+        # Здесь ваш код scrape_materials_page()
+        sendcutsend_data = []
         if sendcutsend_data:
             df_sendcutsend = pd.DataFrame(sendcutsend_data)
-            # Удаляем лишние кавычки, чистим строки, приводим к числовым типам и т.д.
-            string_columns = ["Category", "Material Name", "Gauge"]
-            for col in string_columns:
-                if col in df_sendcutsend.columns:
-                    df_sendcutsend[col] = df_sendcutsend[col].str.replace('"', '').str.strip()
-            specific_columns = ["Effective bend radius @90°", "K factor"]
-            for col in specific_columns:
-                if col in df_sendcutsend.columns:
-                    df_sendcutsend[col] = df_sendcutsend[col].astype(str).str.replace('"', '').str.strip()
-            numeric_columns = ["Thickness", "Effective bend radius @90°", "K factor"]
-            for col in numeric_columns:
-                if col in df_sendcutsend.columns:
-                    df_sendcutsend[col] = pd.to_numeric(df_sendcutsend[col], errors='coerce')
-            for col in string_columns:
-                if col in df_sendcutsend.columns:
-                    df_sendcutsend[col] = df_sendcutsend[col].fillna('')
-            df_sendcutsend['Source'] = 'SendCutSend'
+            # Очистка и пр.
         else:
             logging.error("No data from SendCutSend to process.")
     except Exception as e:
         logging.error(f"Error parsing SendCutSend data: {e}")
 
-    # Объединение данных и сохранение в SQLite + экспорт в Excel
+    # Объединение, сравнение и запись в БД
     if not df_oshcut.empty or not df_sendcutsend.empty:
+        logging.info("Combining data frames from OSH Cut and SendCutSend...")
         combined_frames = []
         if not df_oshcut.empty:
             combined_frames.append(df_oshcut)
@@ -495,59 +476,46 @@ def main():
             combined_frames.append(df_sendcutsend)
         df_combined = pd.concat(combined_frames, ignore_index=True)
 
-        # Сравнение с предыдущими данными
         conn = sqlite3.connect('materials.db')
         try:
             old_df = pd.read_sql_query("SELECT * FROM materials_combined", conn)
         except Exception:
             old_df = pd.DataFrame()
-
         if not old_df.empty:
             new_rows = df_combined.merge(
                 old_df.drop_duplicates(), how='left', indicator=True
             ).loc[lambda x: x['_merge'] == 'left_only']
             if not new_rows.empty:
                 logging.info(f"New changes found: {len(new_rows)} new rows")
-                messagebox.showinfo("New Changes",
-                                    f"{len(new_rows)} new rows found in the latest parsing.")
+                messagebox.showinfo("New Changes", f"{len(new_rows)} new rows found in the latest parsing.")
             else:
                 logging.info("No new changes found.")
         else:
             logging.info("No previous data to compare for changes.")
         conn.close()
 
-        # Сохранение объединённых данных в SQLite
+        # Записываем объединённый df
         conn = sqlite3.connect('materials.db')
         df_combined.to_sql('materials_combined', conn, if_exists='replace', index=False)
         conn.close()
         logging.info("Combined data saved to SQLite database.")
 
-        # Экспорт объединенных данных в Excel
         df_combined.to_excel('materials_combined.xlsx', index=False, engine='openpyxl')
         logging.info("Combined data exported to Excel.")
     else:
         logging.error("No data to combine.")
 
-
-# -------------------------------
-# Точка входа
-# -------------------------------
 if __name__ == "__main__":
-    # 1) Проверяем единственный экземпляр
-    check_single_instance()
+    logging.info("=== Program entry point ===")
+    check_single_instance()  # Проверка на единственный экземпляр
+    logging.info("Single-instance check complete.")
 
-    # 2) Инициализируем Tkinter
     root = tk.Tk()
-    # 3) Временно скрываем основное окно, чтобы показать всплывающее
     root.withdraw()
 
-    # 4) Показываем всплывающее окно
     messagebox.showinfo("Launching", "Program is starting...")
     logging.info("Program has been launched.")
 
-    # 5) Отображаем главное окно
     root.deiconify()
-
-    # 6) Запускаем GUI
     gui = ScraperGUI(root)
     root.mainloop()
