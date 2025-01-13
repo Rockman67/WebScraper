@@ -278,35 +278,30 @@ def save_screenshot(driver, screenshot_folder, filename):
 # ------------------------------- OSH Cut Parsing -----------------------
 # =====================================================================
 def navigate_to_sheet_page(driver, screenshot_folder):
+    """Navigates to the 'Sheet' catalog page."""
     SHEET_URL = "https://app.oshcut.com/catalog/sheet"
-    MAX_RETRIES = 2  # Можно 3, если хотите больше попыток
+    try:
+        driver.get(SHEET_URL)
+        logging.info(f"Loaded page: {SHEET_URL}")
 
-    for attempt in range(1, MAX_RETRIES + 1):
-        try:
-            logging.info(f"Loading OSH Cut page (attempt {attempt}/{MAX_RETRIES}): {SHEET_URL}")
-            driver.get(SHEET_URL)
+        wait = WebDriverWait(driver, 60)  # или 90, если сайт медленный
+        # Ждём появления блока с 'Material' (заголовок или фильтр)
+        wait.until(EC.presence_of_element_located(
+            (By.XPATH, "//div[contains(@class, 'filterBoxHeader') and contains(text(), 'Material')]"))
+        )
+        logging.info("Categories loaded.")
+        time.sleep(2)
+    except TimeoutException:
+        logging.exception("Timeout while loading the 'Sheet' page.")
+        if driver:
+            save_screenshot(driver, screenshot_folder, 'navigate_to_sheet_timeout.png')
+        raise
+    except Exception as e:
+        logging.exception(f"Error loading 'Sheet' page: {e}")
+        if driver:
+            save_screenshot(driver, screenshot_folder, 'navigate_to_sheet_error.png')
+        raise
 
-            wait = WebDriverWait(driver, 60)
-            wait.until(EC.presence_of_element_located(
-                (By.XPATH, "//div[contains(@class, 'filterBoxHeader') and contains(text(), 'Material')]"))
-            )
-            logging.info("Categories loaded. Page is ready.")
-            time.sleep(2)
-            return  # Если здесь успешно - выходим из функции
-        except TimeoutException:
-            logging.exception("Timeout while waiting for 'Material' filter to appear.")
-            save_screenshot(driver, screenshot_folder, f"navigate_to_sheet_timeout_attempt{attempt}.png")
-            if attempt == MAX_RETRIES:
-                raise
-            else:
-                logging.info(f"Retrying page load (attempt {attempt+1}/{MAX_RETRIES})...")
-        except Exception as e:
-            logging.exception(f"Error loading '{SHEET_URL}' (attempt {attempt}/{MAX_RETRIES}): {e}")
-            save_screenshot(driver, screenshot_folder, f"navigate_to_sheet_error_attempt{attempt}.png")
-            if attempt == MAX_RETRIES:
-                raise
-            else:
-                logging.info(f"Retrying page load (attempt {attempt+1}/{MAX_RETRIES})...")
 
 
 def extract_categories(driver):
