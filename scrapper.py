@@ -33,25 +33,60 @@ import socket
 # -------------------------------------------------------------
 #lockfile = None
 
+import os
+import sys
+import logging
+import socket
+import tkinter.messagebox as mb
+
+def setup_logging():
+    """
+    Настраиваем логирование так, чтобы:
+    1) Файл scraper.log лежал рядом с EXE или со скриптом.
+    2) При аварийном выходе лог успевал сброситься.
+    """
+    # Определяем путь к логу рядом с EXE (или .py)
+    if getattr(sys, 'frozen', False):
+        # Если собрано PyInstaller, sys.executable - путь к .exe
+        base_dir = os.path.dirname(sys.executable)
+    else:
+        # Иначе - путь к текущему .py
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+
+    log_path = os.path.join(base_dir, "scraper.log")
+
+    # Создаём (или пересоздаём) logger
+    logging.root.handlers = []
+    logging.root.setLevel(logging.INFO)
+
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+
+    fh = logging.FileHandler(log_path, encoding='utf-8')
+    fh.setLevel(logging.INFO)
+    fh.setFormatter(formatter)
+
+    logging.root.addHandler(fh)
+
+    logging.info("[LOG_SETUP] Logging initialized at '%s'.", log_path)
+
+
 def check_single_instance():
     """
     Проверяет единственный экземпляр приложения:
-    - На Windows — через именованный мьютекс (CreateMutex).
-    - На других ОС — через локальный сокет (127.0.0.1:65432).
-    Если программа уже запущена, выводит предупреждение и завершает работу (os._exit(0)).
+    - На Windows: именованный мьютекс (CreateMutex).
+    - На других ОС: локальный сокет.
+    При обнаружении второго экземпляра:
+    1) Выдаёт окно предупреждения,
+    2) Пишет логи,
+    3) Вызывает logging.shutdown(),
+    4) Вызывает os._exit(0).
     """
+    import ctypes
+    from ctypes import wintypes
 
-    import os
-    import logging
-    import socket  # нужно для проверки на Linux/Mac
-
-    logging.info("[SINGLE_INSTANCE] check_single_instance() called...")
+    logging.info("[SINGLE_INSTANCE] check_single_instance() called.")
 
     if os.name == 'nt':
-        import ctypes
-        from ctypes import wintypes
-        from tkinter import messagebox
-
         kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
 
         CreateMutex = kernel32.CreateMutexW
@@ -61,44 +96,39 @@ def check_single_instance():
         GetLastError = ctypes.get_last_error
         ERROR_ALREADY_EXISTS = 183
 
-        mutex_name = "Global\\SendCutSendScraperMutex"  # Имя мьютекса (уникальное для вашего приложения)
+        mutex_name = "Global\\SendCutSendScraperMutex"
 
-        logging.info(f"[SINGLE_INSTANCE] Attempting CreateMutex with name: {mutex_name}")
+        logging.info("[SINGLE_INSTANCE] Attempting CreateMutex: %s", mutex_name)
         h_mutex = CreateMutex(None, False, mutex_name)
         last_error = GetLastError()
-        logging.info(f"[SINGLE_INSTANCE] CreateMutex returned handle={h_mutex}, last_error={last_error}")
+        logging.info("[SINGLE_INSTANCE] CreateMutex handle=%r, last_error=%r", h_mutex, last_error)
 
-        # Если не удалось создать мьютекс (вернулся handle=0)
         if not h_mutex:
-            logging.error("[SINGLE_INSTANCE] Failed to create mutex handle. Exiting via os._exit(1).")
-            messagebox.showerror("Error", "Failed to create mutex for single instance check.")
-            os._exit(1)  # жёсткий выход
+            logging.error("[SINGLE_INSTANCE] Failed to create mutex. Exiting.")
+            mb.showerror("Error", "Failed to create mutex for single instance check.")
+            logging.shutdown()  # Сбрасываем логи
+            os._exit(1)
 
-        # Если уже существует -> второй экземпляр
         if last_error == ERROR_ALREADY_EXISTS:
-            logging.warning("[SINGLE_INSTANCE] Mutex indicates process is already running. Exiting via os._exit(0).")
-            messagebox.showwarning("Warning", "Program is already running.")
-            os._exit(0)  # жёсткий выход
+            logging.warning("[SINGLE_INSTANCE] Another instance detected. Exiting now.")
+            mb.showwarning("Warning", "Program is already running.")
+            logging.shutdown()  # Сбрасываем логи
+            os._exit(0)
 
-        # Если дошли сюда — мы первый экземпляр
-        logging.info("[SINGLE_INSTANCE] Mutex created successfully (this is the first instance).")
-
+        logging.info("[SINGLE_INSTANCE] Mutex created successfully. First instance.")
     else:
-        # Для Linux/Mac — проверка через сокет
-        from tkinter import messagebox
-
-        logging.info("[SINGLE_INSTANCE] Non-Windows system - using socket for single instance check.")
+        logging.info("[SINGLE_INSTANCE] Non-Windows system => using socket approach.")
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             s.bind(("127.0.0.1", 65432))
         except socket.error:
-            logging.warning("[SINGLE_INSTANCE] Socket bind failed - program is already running. Exiting via os._exit(0).")
-            messagebox.showwarning("Warning", "Program is already running.")
-            os._exit(0)  # жёсткий выход
-
-        logging.info("[SINGLE_INSTANCE] Socket bind successful (this is the first instance).")
-        # Возвращаем сокет, чтобы он не освободился до выхода программы
+            logging.warning("[SINGLE_INSTANCE] Socket already in use => second instance. Exiting.")
+            mb.showwarning("Warning", "Program is already running.")
+            logging.shutdown()
+            os._exit(0)
+        logging.info("[SINGLE_INSTANCE] Socket bind successful. This is first instance.")
         return s
+
 
 
 
