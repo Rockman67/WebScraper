@@ -11,6 +11,11 @@ jobs:
   build:
     runs-on: windows-latest
 
+    # Добавляем concurrency, чтобы не было параллельных запусков
+    concurrency:
+      group: "build-scrapper"          # Название группы (уникальное)
+      cancel-in-progress: true         # Отменять предыдущий запущенный workflow при новом
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
@@ -18,7 +23,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.8'  # Или другую версию Python, если необходимо
+        python-version: '3.8'  # Или другую версию Python, если нужно
 
     - name: Install dependencies
       run: |
@@ -28,10 +33,22 @@ jobs:
 
     - name: Build executable with PyInstaller
       run: |
-        python -m PyInstaller --onefile --windowed --hidden-import=selenium --hidden-import=webdriver_manager --hidden-import=bs4 --hidden-import=pandas scrapper.py
+        python -m PyInstaller --onefile --windowed \
+          --hidden-import=selenium \
+          --hidden-import=webdriver_manager \
+          --hidden-import=bs4 \
+          --hidden-import=pandas \
+          scrapper.py
 
     - name: Upload artifact
       uses: actions/upload-artifact@v3
       with:
         name: WebScraperExecutable
         path: dist/scrapper.exe
+
+    # --- Дополнительно (по желанию): тестовый одиночный запуск exe ---
+    - name: Run scrapper.exe (optional test)
+      shell: cmd
+      run: |
+        echo "Running scrapper.exe once to verify single-instance lock..."
+        dist\scrapper.exe
