@@ -1198,6 +1198,11 @@ if __name__ == "__main__":
     single_instance_lock = check_single_instance()
 
     root = tk.Tk()
+    root.withdraw()
+    messagebox.showinfo("Launching", "Program is starting...")
+    logging.info("Program has been launched.")
+    root.deiconify()
+
     gui = ScraperGUI(root)
     root.mainloop()
 
