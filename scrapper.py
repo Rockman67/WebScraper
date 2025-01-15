@@ -26,6 +26,30 @@ from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 import pandas as pd
 
+def check_single_instance():
+    import ctypes
+    from ctypes import wintypes
+    import tkinter.messagebox as mb
+
+    kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
+    CreateMutex = kernel32.CreateMutexW
+    CreateMutex.argtypes = (ctypes.c_void_p, wintypes.BOOL, wintypes.LPCWSTR)
+    CreateMutex.restype = wintypes.HANDLE
+
+    GetLastError = ctypes.get_last_error
+    ERROR_ALREADY_EXISTS = 183
+
+    mutex_name = "Global\\MyUniqueScraperMutex"
+
+    h_mutex = CreateMutex(None, False, mutex_name)
+    last_error = GetLastError()
+    if not h_mutex:
+        mb.showerror("Error", "Failed to create mutex for single instance.")
+        sys.exit(1)
+    if last_error == ERROR_ALREADY_EXISTS:
+        mb.showwarning("Warning", "Program is already running.")
+        sys.exit(0)
+
 def sort_column(tv, col, reverse):
     l = [(tv.set(k, col), k) for k in tv.get_children('')]
     try:
@@ -1087,6 +1111,14 @@ def main():
 
 
 if __name__ == "__main__":
+    check_single_instance()
+
+    # Проверка test-mode:
+    if "--test" in sys.argv:
+        print("Running test mode. Exiting.")
+        sys.exit(0)
+
     root = tk.Tk()
     gui = ScraperGUI(root)
     root.mainloop()
+
