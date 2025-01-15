@@ -31,28 +31,53 @@ import socket
 # -------------------------------------------------------------
 # Глобальная переменная для хранения ссылки на файл-блокировку (Windows)
 # -------------------------------------------------------------
-lockfile = None
+#lockfile = None
 
 def check_single_instance():
     """
     Проверяет единственный экземпляр приложения:
-    - На Windows — через файл-блокировку (app.lock).
-    - На других ОС — через локальный сокет.
+    - На Windows — через именованный мьютекс.
+    - На других ОС — через локальный сокет (127.0.0.1:65432).
     Если программа уже запущена, выводит предупреждение и завершает работу.
     """
-    global lockfile
-    if os.name == 'nt':  # Если ОС Windows
-        import msvcrt
-        try:
-            # Определяем путь рядом с исполняемым файлом (или скриптом)
-            exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
-            lock_path = os.path.join(exe_dir, "app.lock")
+    if os.name == 'nt':
+        # --- BEGIN: именованный мьютекс через ctypes ---
+        import ctypes
+        from ctypes import wintypes
 
-            lockfile = open(lock_path, "w")
-            msvcrt.locking(lockfile.fileno(), msvcrt.LK_NBLCK, 1)
-        except IOError:
+        kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
+
+        # Функция CreateMutexW создаёт или открывает именованный мьютекс
+        CreateMutex = kernel32.CreateMutexW
+        CreateMutex.argtypes = (ctypes.c_void_p, wintypes.BOOL, wintypes.LPCWSTR)
+        CreateMutex.restype = wintypes.HANDLE
+
+        # Получаем последнюю ошибку из WinAPI
+        GetLastError = ctypes.get_last_error
+
+        # Ошибка 183 ("Already exists") значит, что мьютекс уже есть => второе приложение.
+        ERROR_ALREADY_EXISTS = 183
+
+        # Название мьютекса (можно любое, главное чтобы уникально для вашего приложения)
+        mutex_name = "Global\\SendCutSendScraperMutex"
+
+        # Создаём (или открываем) именованный мьютекс
+        h_mutex = CreateMutex(None, False, mutex_name)
+        last_error = GetLastError()
+
+        if h_mutex == 0:
+            # Ошибка создания
+            messagebox.showerror("Error", "Failed to create mutex for single instance check.")
+            sys.exit(1)
+
+        if last_error == ERROR_ALREADY_EXISTS:
+            # Мьютекс уже существует => приложение уже запущено
             messagebox.showwarning("Warning", "Program is already running.")
             sys.exit(0)
+
+        # Иначе мы первый (единственный) экземпляр — просто продолжаем работу.
+        # h_mutex сохраняется в переменной, чтобы не освободить мьютекс.
+        # --- END: именованный мьютекс ---
     else:
         # Для остальных ОС используем проверку через сокет
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -61,8 +86,9 @@ def check_single_instance():
         except socket.error:
             messagebox.showwarning("Warning", "Program is already running.")
             sys.exit(0)
-        # Возвращаем сокет, чтобы он не освободился
+        # Важно: не даём сокету освободиться, поэтому return
         return s
+
 
 def sort_column(tv, col, reverse):
     l = [(tv.set(k, col), k) for k in tv.get_children('')]
