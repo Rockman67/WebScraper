@@ -11,10 +11,10 @@ jobs:
   build:
     runs-on: windows-latest
 
-    # Добавляем concurrency, чтобы не было параллельных запусков
+    # concurrency, чтобы не было параллельных сборок
     concurrency:
-      group: "build-scrapper"          # Название группы (уникальное)
-      cancel-in-progress: true         # Отменять предыдущий запущенный workflow при новом
+      group: "build-scrapper"
+      cancel-in-progress: true
 
     steps:
     - name: Checkout repository
@@ -23,7 +23,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.8'  # Или другую версию Python, если нужно
+        python-version: '3.8'
 
     - name: Install dependencies
       run: |
@@ -47,7 +47,6 @@ jobs:
         name: WebScraperExecutable
         path: dist/scrapper.exe
 
-    # --- Дополнительно (по желанию): тестовый одиночный запуск exe ---
     - name: Run scrapper.exe (optional test)
       shell: cmd
       run: |
