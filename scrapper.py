@@ -1204,16 +1204,21 @@ def main():
 
 if __name__ == "__main__":
     setup_logging()
-    auto_install_dependencies()  # <-- добавляем вызов
+    auto_install_dependencies()
     single_instance_lock = check_single_instance()
 
+    if "--test" in sys.argv:
+        # CI-тест: проверка single-instance и моментальный выход
+        logging.info("Running in test mode (no GUI). Exiting now.")
+        sys.exit(0)
+
+    # Обычный режим (GUI)
     root = tk.Tk()
     root.withdraw()
-    messagebox.showinfo("Launching", "Program is starting...")
-    logging.info("Program has been launched.")
+    ...
     root.deiconify()
-
     gui = ScraperGUI(root)
     root.mainloop()
+
 
 
