@@ -47,4 +47,11 @@ jobs:
         name: WebScraperExecutable
         path: dist/scrapper.exe
 
+    - name: Run scrapper.exe (optional test)
+      shell: cmd
+      run: |
+        echo "Running scrapper.exe once in --test mode..."
+        dist\scrapper.exe --test
+
+
     
