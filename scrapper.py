@@ -25,6 +25,8 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 import pandas as pd
+import socket
+
 
 # -------------------------------------------------------------
 # Глобальная переменная для хранения ссылки на файл-блокировку (Windows)
@@ -1123,6 +1125,11 @@ def main():
 
 
 if __name__ == "__main__":
+    # 1) Вызываем проверку единственного экземпляра
+    single_instance_lock = check_single_instance()
+
+    # 2) После успешной проверки запускаем GUI
     root = tk.Tk()
     gui = ScraperGUI(root)
     root.mainloop()
+
