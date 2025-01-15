@@ -144,24 +144,33 @@ def sort_column(tv, col, reverse):
     tv.heading(col, command=lambda: sort_column(tv, col, not reverse))
 
 
-# -------------------------------
-# Step 1: Automatic Dependency Installation
-# -------------------------------
-required = {
-    'selenium',
-    'webdriver-manager',
-    'beautifulsoup4',
-    'pandas'
-}
-installed = {pkg.key for pkg in pkg_resources.working_set}
-missing = required - installed
-if missing:
-    try:
-        subprocess.check_call([sys.executable, '-m', 'pip', 'install', *missing],
-                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except subprocess.CalledProcessError as e:
-        print(f"Error installing packages: {e}")
-        sys.exit(1)
+def auto_install_dependencies():
+    """
+    При запуске .py (не внутри PyInstaller) автоматически ставит недостающие пакеты.
+    При запуске из .exe — пропускаем, чтобы не ломалось.
+    """
+    if getattr(sys, "frozen", False):
+        return  # Если упакованы в PyInstaller, ничего не делаем.
+
+    required = {
+        'selenium',
+        'webdriver-manager',
+        'beautifulsoup4',
+        'pandas'
+    }
+    installed = {pkg.key for pkg in pkg_resources.working_set}
+    missing = required - installed
+    if missing:
+        try:
+            subprocess.check_call(
+                [sys.executable, '-m', 'pip', 'install', *missing],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+        except subprocess.CalledProcessError as e:
+            print(f"Error installing packages: {e}")
+            sys.exit(1)
+
 
 # -------------------------------
 # Step 2: GUI Setup with Tkinter
@@ -1194,7 +1203,8 @@ def main():
 
 
 if __name__ == "__main__":
-    setup_logging() 
+    setup_logging()
+    auto_install_dependencies()  # <-- добавляем вызов
     single_instance_lock = check_single_instance()
 
     root = tk.Tk()
