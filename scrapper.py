@@ -1194,6 +1194,7 @@ def main():
 
 
 if __name__ == "__main__":
+    setup_logging() 
     single_instance_lock = check_single_instance()
 
     root = tk.Tk()
