@@ -40,44 +40,40 @@ def check_single_instance():
     - На других ОС — через локальный сокет (127.0.0.1:65432).
     Если программа уже запущена, выводит предупреждение и завершает работу.
     """
+    import socket  # Нужно для проверки на Linux/Mac
+
     if os.name == 'nt':
-        # --- BEGIN: именованный мьютекс через ctypes ---
         import ctypes
         from ctypes import wintypes
 
         kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
 
-        # Функция CreateMutexW создаёт или открывает именованный мьютекс
         CreateMutex = kernel32.CreateMutexW
         CreateMutex.argtypes = (ctypes.c_void_p, wintypes.BOOL, wintypes.LPCWSTR)
         CreateMutex.restype = wintypes.HANDLE
 
-        # Получаем последнюю ошибку из WinAPI
         GetLastError = ctypes.get_last_error
-
-        # Ошибка 183 ("Already exists") значит, что мьютекс уже есть => второе приложение.
         ERROR_ALREADY_EXISTS = 183
 
-        # Название мьютекса (можно любое, главное чтобы уникально для вашего приложения)
+        # Имя мьютекса (уникальное для вашего приложения)
         mutex_name = "Global\\SendCutSendScraperMutex"
 
-        # Создаём (или открываем) именованный мьютекс
+        # Пытаемся создать (или открыть) именованный мьютекс
         h_mutex = CreateMutex(None, False, mutex_name)
         last_error = GetLastError()
 
-        if h_mutex == 0:
-            # Ошибка создания
+        if not h_mutex:
+            # Не удалось создать мьютекс
             messagebox.showerror("Error", "Failed to create mutex for single instance check.")
             sys.exit(1)
 
         if last_error == ERROR_ALREADY_EXISTS:
-            # Мьютекс уже существует => приложение уже запущено
+            # Мьютекс уже существует => второй экземпляр
             messagebox.showwarning("Warning", "Program is already running.")
             sys.exit(0)
 
-        # Иначе мы первый (единственный) экземпляр — просто продолжаем работу.
-        # h_mutex сохраняется в переменной, чтобы не освободить мьютекс.
-        # --- END: именованный мьютекс ---
+        # Если мы здесь, значит первый экземпляр приложения
+        # h_mutex остаётся живым до выхода из приложения.
     else:
         # Для остальных ОС используем проверку через сокет
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -86,8 +82,8 @@ def check_single_instance():
         except socket.error:
             messagebox.showwarning("Warning", "Program is already running.")
             sys.exit(0)
-        # Важно: не даём сокету освободиться, поэтому return
         return s
+
 
 
 def sort_column(tv, col, reverse):
@@ -1151,11 +1147,10 @@ def main():
 
 
 if __name__ == "__main__":
-    # 1) Вызываем проверку единственного экземпляра
     single_instance_lock = check_single_instance()
 
-    # 2) После успешной проверки запускаем GUI
     root = tk.Tk()
     gui = ScraperGUI(root)
     root.mainloop()
+
 
