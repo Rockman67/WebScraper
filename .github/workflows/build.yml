@@ -50,5 +50,5 @@ jobs:
     - name: Run scrapper.exe (optional test)
       shell: cmd
       run: |
-        echo "Running scrapper.exe once to verify single-instance lock..."
-        dist\scrapper.exe
+        echo "Running scrapper.exe once to verify single-instance lock in test mode..."
+        dist\scrapper.exe --test
