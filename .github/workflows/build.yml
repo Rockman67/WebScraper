@@ -11,7 +11,7 @@ jobs:
   build:
     runs-on: windows-latest
 
-    # concurrency, чтобы не было параллельных сборок
+    # concurrency позволяет избежать параллельных конфликтующих сборок
     concurrency:
       group: "build-scrapper"
       cancel-in-progress: true
@@ -32,6 +32,7 @@ jobs:
         pip install pyinstaller
 
     - name: Build executable with PyInstaller
+      # Используем shell: cmd, чтобы корректно передавать ^ (переносы строк)
       shell: cmd
       run: |
         python -m PyInstaller --onefile --windowed ^
@@ -47,11 +48,9 @@ jobs:
         name: WebScraperExecutable
         path: dist/scrapper.exe
 
+    # Опциональный тест запуска .exe в режиме "--test" (чтобы не открывался GUI)
     - name: Run scrapper.exe (optional test)
       shell: cmd
       run: |
         echo "Running scrapper.exe once in --test mode..."
         dist\scrapper.exe --test
-
-
-    
